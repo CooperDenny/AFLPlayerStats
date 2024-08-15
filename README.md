@@ -1,6 +1,6 @@
-# **AFLPlayerData**
+# **AFLPlayerStats**
 
-**AFLPlayerData** is a collection of R scripts and CSV files designed for downloading, analyzing, and managing Australian Football League (AFL) player data. This project leverages several R libraries to scrape, clean, transform, and summarize player and team data, providing insights into player performance and AFL match outcomes.
+**AFLPlayerStats** is a collection of R scripts and CSV files designed for downloading, analyzing, and managing Australian Football League (AFL) player data. This project leverages several R libraries to scrape, clean, transform, and summarize player and team data, providing insights into player performance and AFL match outcomes.
 
 ## **Project Structure**
 
