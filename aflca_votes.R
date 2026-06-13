@@ -3,90 +3,87 @@
 # Project:       AFLPlayerData
 # Author:        Cooper Denny
 #
-# Purpose:       Code to transform and summarize AFL coaches votes data
+# Purpose:       Code to transform and summarise AFL coaches votes data
 ####################################################################################
 
-# Load necessary libraries
-library(tidyverse) # For data manipulation
-library(fitzRoy)   # For accessing AFL data
-library(rvest)     # For web scraping
-library(polite)    # For polite web scraping
-library(ordinal)   # For ordinal logistic regression
-library(knitr)     # For dynamic report generation
-library(unglue)    # For ungluing strings
+library(fitzRoy)
+library(tidyverse)
 
 ####################################################################################
-# Scrape AFL coaches votes data for selected round and season, then clean up
+# Configuration
 ####################################################################################
 
-# Define the current season and round number for which to update data
-Season = 2024
-Round_Number = 22
+output_path     <- "Player Data/AFLCA Votes/aflca_votes.csv"
+start_year      <- 2006   # earliest year available via fetch_coaches_votes()
+end_year        <- as.integer(format(Sys.Date(), "%Y"))
+fetch_from_year <- 2026   # always re-fetch this season onwards
 
-# Create a bow object for scraping the coaches votes leaderboard
-coaches_scrape <- bow(paste0("https://aflcoaches.com.au/awards/the-aflca-champion-player-of-the-year-award/leaderboard/",
-                             Season, "/", Season + 1, "01", Round_Number + 1))
-# Scrape the data from the webpage
-coaches_data <- scrape(coaches_scrape)
+####################################################################################
+# Determine which seasons to fetch
+####################################################################################
 
-# Extract player names from the HTML nodes
-Player.Name <- coaches_data %>%
-  html_nodes(".div-hover .col-10") %>% 
-  html_text() %>%
-  str_remove("\n\t\t\t\t\t\t\t\t\t") %>% 
-  str_remove("\n\t\t\t\t\t\t\t\t")
+existing_data <- if (file.exists(output_path)) read.csv(output_path) else NULL
 
-# Extract coaches votes from the HTML nodes
-Coaches.Votes <- coaches_data %>%
-  html_nodes(".div-hover strong") %>% 
-  html_text()
+existing_years   <- if (!is.null(existing_data)) unique(existing_data$Year) else integer(0)
+missing_years    <- setdiff(start_year:(end_year - 1), existing_years)
+seasons_to_fetch <- sort(unique(c(missing_years, fetch_from_year:end_year)))
 
-# Create a data frame with the extracted data
-coaches_votes_new <- data.frame(Coaches.Votes, Player.Name)
+message("Fetching seasons: ", paste(seasons_to_fetch, collapse = ", "))
 
-# Add season and round number columns
-coaches_votes_new$Season = Season
-coaches_votes_new$Round = Round_Number
+####################################################################################
+# Fetch and process each season
+####################################################################################
 
-# Unglue player name data into separate columns and arrange by season and round
-coaches_votes_new <- unglue_unnest(coaches_votes_new, Player.Name, "{First.Name} {Surname} {Team.Name}") %>% 
-  arrange(Season, Round)
+fetch_season <- function(year) {
+  message("  Fetching ", year, "...")
 
-# Adjust surname by appending the team name extracted from parentheses
-coaches_votes_new$Surname <- paste(coaches_votes_new$Surname, str_extract(coaches_votes_new$Team.Name, "^[^\\(]+"))
+  df <- tryCatch(
+    fetch_coaches_votes(season = year, comp = "AFLM"),
+    error = function(e) { warning("Fetch failed for ", year, ": ", e$message); NULL }
+  )
 
-# Remove "NA" and adjust team names
-coaches_votes_new$Surname <- coaches_votes_new$Surname %>% str_remove(" NA")
-coaches_votes_new$Team.Name <- str_replace(coaches_votes_new$Team.Name, "^[^\\(]+\\s*\\(", "")
-coaches_votes_new$Team.Name <- str_replace(coaches_votes_new$Team.Name, "\\)", "")
-coaches_votes_new$Team.Name <- str_replace(coaches_votes_new$Team.Name, "\\(", "")
-
-# Trim trailing spaces in surnames
-for(i in 1:nrow(coaches_votes_new)){
-  if (substr(coaches_votes_new$Surname[i], nchar(coaches_votes_new$Surname[i]), nchar(coaches_votes_new$Surname[i])) == " ") {
-    coaches_votes_new$Surname[i] <- substr(coaches_votes_new$Surname[i], 1, nchar(coaches_votes_new$Surname[i]) - 1)
+  if (is.null(df) || nrow(df) == 0) {
+    warning("No data for season ", year)
+    return(NULL)
   }
+
+  # Player.Name format: "Isaac Heeney (SYD)"
+  df %>%
+    mutate(
+      Team.Name   = str_extract(Player.Name, "(?<=\\()\\w+(?=\\))"),
+      Player.Name = str_remove(Player.Name, "\\s*\\(\\w+\\)")
+    ) %>%
+    separate(Player.Name, into = c("First.Name", "Surname"), sep = " ", extra = "merge", fill = "right") %>%
+    transmute(
+      Coaches.Votes = as.numeric(Coaches.Votes),
+      Year          = as.integer(Season),
+      Round.Number  = as.integer(Round),
+      First.Name    = as.character(First.Name),
+      Surname       = as.character(Surname),
+      Team.Name     = as.character(Team.Name)
+    )
 }
 
-# Rename columns for clarity
-colnames(coaches_votes_new) <- c("Coaches.Votes", "Year", "Round.Number", "First.Name", "Surname", "Team.Name")
+new_data <- map(seasons_to_fetch, fetch_season) %>%
+  compact() %>%
+  bind_rows()
 
 ####################################################################################
-# Load existing coaches votes data and combine with new data
+# Combine with existing data, replacing re-fetched seasons
 ####################################################################################
 
-# Read existing AFLCA votes data from a CSV file
-coaches_votes <- read.csv("Player Data/AFLCA Votes/aflca_votes.csv")
+if (!is.null(existing_data) && nrow(new_data) > 0) {
+  coaches_votes <- existing_data %>%
+    filter(!Year %in% seasons_to_fetch) %>%
+    bind_rows(new_data)
+} else {
+  coaches_votes <- if (is.null(existing_data)) new_data else existing_data
+}
 
-# Combine existing and new coaches votes data into a single data frame
-coaches_votes <- rbind(coaches_votes, coaches_votes_new)
+coaches_votes <- coaches_votes %>%
+  distinct() %>%
+  arrange(Year, Round.Number)
 
-# Remove duplicate entries
-coaches_votes <- coaches_votes %>% distinct()
+write.csv(coaches_votes, output_path, row.names = FALSE)
 
-# Save updated coaches votes data to a CSV file
-write.csv(coaches_votes, "Player Data/AFLCA Votes/aflca_votes.csv", row.names=FALSE)
-
-# Clean up the environment by removing all objects
-#rm(list=ls())
-
+message("Done. ", nrow(coaches_votes), " rows saved to ", output_path)
