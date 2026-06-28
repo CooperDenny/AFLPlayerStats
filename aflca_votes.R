@@ -58,8 +58,9 @@ message("Fetching seasons: ", paste(seasons_to_fetch, collapse = ", "))
 fetch_season <- function(year) {
   message("  Fetching ", year, "...")
 
-  # For Opening Round seasons, coaches votes round 25 = AFL API round 24
-  fetch_rounds <- if (has_opening_round(year)) 1:25 else 1:24
+  valid        <- get_valid_rounds(year)
+  round_offset <- if (has_opening_round(year)) 1L else 0L
+  fetch_rounds <- (min(valid) + round_offset):(max(valid) + round_offset)
 
   df <- tryCatch(
     fetch_coaches_votes(season = year, comp = "AFLM", round_number = fetch_rounds),
