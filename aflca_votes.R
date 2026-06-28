@@ -39,7 +39,10 @@ get_valid_rounds <- function(year) {
 
 existing_data <- if (file.exists(output_path)) {
   read.csv(output_path) %>%
-    filter(Year >= start_year, Coaches.Votes == floor(Coaches.Votes))
+    filter(Year >= start_year) %>%
+    group_by(Year, Round.Number, Home.Team, Away.Team) %>%
+    filter(all(Coaches.Votes == floor(Coaches.Votes))) %>%
+    ungroup()
 } else NULL
 
 existing_years   <- if (!is.null(existing_data)) unique(existing_data$Year) else integer(0)
@@ -77,16 +80,19 @@ fetch_season <- function(year) {
     ) %>%
     separate(Player.Name, into = c("First.Name", "Surname"), sep = " ", extra = "merge", fill = "right") %>%
     transmute(
-      Coaches.Votes = as.numeric(Coaches.Votes),
       Year          = as.integer(Season),
       Round.Number  = as.integer(Round) - round_offset,
-      Home.Team     = as.character(Home.Team),
-      Away.Team     = as.character(Away.Team),
       First.Name    = as.character(First.Name),
       Surname       = as.character(Surname),
-      Team.Name     = as.character(Team.Name)
+      Team.Name     = as.character(Team.Name),
+      Coaches.Votes = as.numeric(Coaches.Votes),
+      Home.Team     = as.character(Home.Team),
+      Away.Team     = as.character(Away.Team)
     ) %>%
-    filter(Round.Number %in% get_valid_rounds(year), Coaches.Votes == floor(Coaches.Votes))
+    group_by(Round.Number, Home.Team, Away.Team) %>%
+    filter(all(Coaches.Votes == floor(Coaches.Votes))) %>%
+    ungroup() %>%
+    filter(Round.Number %in% get_valid_rounds(year))
 }
 
 new_data <- map(seasons_to_fetch, fetch_season) %>%
@@ -106,8 +112,7 @@ if (!is.null(existing_data) && nrow(new_data) > 0) {
 }
 
 coaches_votes <- coaches_votes %>%
-  distinct() %>%
-  arrange(Year, Round.Number)
+  distinct()
 
 write.csv(coaches_votes, output_path, row.names = FALSE)
 
