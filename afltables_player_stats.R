@@ -6,8 +6,7 @@
 # Purpose:       Code to transform and summarise AFL player data from 1897-
 ####################################################################################
 
-library(fitzRoy)
-library(tidyverse)
+source("setup.R")
 
 ####################################################################################
 # Configuration
@@ -36,6 +35,13 @@ message("Fetching seasons: ", paste(seasons_to_fetch, collapse = ", "))
 ####################################################################################
 # Fetch and clean each season
 ####################################################################################
+
+has_opening_round <- function(year) {
+  if (year < 2024) return(FALSE)
+  fixture <- tryCatch(fetch_fixture(season = year, comp = "AFLM"), error = function(e) NULL)
+  if (is.null(fixture)) return(FALSE)
+  0L %in% fixture$round.roundNumber
+}
 
 clean_season <- function(df) {
   df$Jumper.No. <- df$Jumper.No. %>% str_remove(" ↓") %>% str_remove(" ↑")
@@ -95,7 +101,19 @@ fetch_season <- function(year) {
     return(NULL)
   }
 
-  clean_season(df)
+  cleaned <- clean_season(df)
+
+  # For Opening Round seasons, shift numeric rounds down by 1 to align with AFL API
+  # (Opening Round = "0", Rd 1 = "1"). Finals labels (EF, QF, etc.) are unchanged.
+  if (has_opening_round(year)) {
+    cleaned <- cleaned %>%
+      mutate(Round = {
+        n <- suppressWarnings(as.integer(Round))
+        if_else(!is.na(n), as.character(n - 1L), Round)
+      })
+  }
+
+  cleaned
 }
 
 new_data <- map(seasons_to_fetch, fetch_season) %>%

@@ -6,8 +6,7 @@
 # Purpose:       Code to scrape and clean AFL player and team data from 2015-
 ####################################################################################
 
-library(fitzRoy)
-library(tidyverse)
+source("setup.R")
 
 ####################################################################################
 # Configuration
