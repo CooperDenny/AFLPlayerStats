@@ -127,6 +127,7 @@ new_data <- map(seasons_to_fetch, fetch_season) %>%
 new_data %>%
   group_by(Season) %>%
   group_walk(function(df, key) {
+    df <- df %>% mutate(Season = key$Season)
     file_path <- file.path(output_dir, paste0("afltables_player_stats_", key$Season, ".csv"))
     write.csv(df, file_path, row.names = FALSE)
     message("  Wrote ", nrow(df), " rows to ", basename(file_path))

@@ -3,7 +3,11 @@
 # Project:       AFLPlayerData
 # Author:        Cooper Denny
 #
-# Purpose:       Code to transform and summarise AFL coaches votes data
+# Purpose:       Function to fetch AFLCA coaches votes for a single season/round
+#                and append the results to the existing CSV.
+#
+# Usage:         source("aflca_votes.R")
+#                append_aflca_votes_round(year = 2026, round = 12)
 ####################################################################################
 
 source("setup.R")
@@ -12,10 +16,7 @@ source("setup.R")
 # Configuration
 ####################################################################################
 
-output_path     <- "Player Data/AFLCA Votes/aflca_votes.csv"
-start_year      <- 2015
-end_year        <- as.integer(format(Sys.Date(), "%Y"))
-fetch_from_year <- 2026   # always re-fetch this season onwards
+output_path <- "Player Data/AFLCA Votes/aflca_votes.csv"
 
 # Hardcoded AFL API round ranges per season (Opening Round = round 0 for 2024+)
 season_round_ranges <- list(
@@ -25,7 +26,7 @@ season_round_ranges <- list(
   `2024` = 0:24, `2025` = 0:24, `2026` = 0:15
 )
 
-# For Opening Round seasons coaches votes round numbers are offset by +1 vs AFL API
+# For Opening Round seasons, coaches votes round numbers are offset by +1 vs AFL API
 has_opening_round <- function(year) year >= 2024
 
 get_valid_rounds <- function(year) {
@@ -34,47 +35,26 @@ get_valid_rounds <- function(year) {
 }
 
 ####################################################################################
-# Determine which seasons to fetch
+# Function
 ####################################################################################
 
-existing_data <- if (file.exists(output_path)) {
-  read.csv(output_path) %>%
-    filter(Year >= start_year) %>%
-    group_by(Year, Round.Number, Home.Team, Away.Team) %>%
-    filter(all(Coaches.Votes == floor(Coaches.Votes))) %>%
-    ungroup()
-} else NULL
-
-existing_years   <- if (!is.null(existing_data)) unique(existing_data$Year) else integer(0)
-missing_years    <- setdiff(start_year:(end_year - 1), existing_years)
-seasons_to_fetch <- sort(unique(c(missing_years, fetch_from_year:end_year)))
-
-message("Fetching seasons: ", paste(seasons_to_fetch, collapse = ", "))
-
-####################################################################################
-# Fetch and process each season
-####################################################################################
-
-fetch_season <- function(year) {
-  message("  Fetching ", year, "...")
-
-  valid        <- get_valid_rounds(year)
+append_aflca_votes_round <- function(year, round) {
   round_offset <- if (has_opening_round(year)) 1L else 0L
-  fetch_rounds <- (min(valid) + round_offset):(max(valid) + round_offset)
+  api_round    <- round + round_offset
+
+  message("Fetching ", year, " round ", round, " (API round ", api_round, ")...")
 
   df <- tryCatch(
-    fetch_coaches_votes(season = year, comp = "AFLM", round_number = fetch_rounds),
-    error = function(e) { warning("Fetch failed for ", year, ": ", e$message); NULL }
+    fetch_coaches_votes(season = year, comp = "AFLM", round_number = api_round),
+    error = function(e) { stop("Fetch failed: ", e$message) }
   )
 
   if (is.null(df) || nrow(df) == 0) {
-    warning("No data for season ", year)
-    return(NULL)
+    message("No data returned for ", year, " round ", round)
+    return(invisible(NULL))
   }
 
-  round_offset <- if (has_opening_round(year)) 1L else 0L
-
-  df %>%
+  new_rows <- df %>%
     mutate(
       Team.Name   = str_extract(Player.Name, "(?<=\\()\\w+(?=\\))"),
       Player.Name = str_remove(Player.Name, "\\s*\\(\\w+\\)")
@@ -93,28 +73,27 @@ fetch_season <- function(year) {
     group_by(Round.Number, Home.Team, Away.Team) %>%
     filter(all(Coaches.Votes == floor(Coaches.Votes))) %>%
     ungroup() %>%
-    filter(Round.Number %in% get_valid_rounds(year))
+    filter(Round.Number == round)
+
+  if (nrow(new_rows) == 0) {
+    message("No complete votes data for ", year, " round ", round)
+    return(invisible(NULL))
+  }
+
+  existing <- if (file.exists(output_path)) read.csv(output_path) else NULL
+
+  combined <- if (!is.null(existing)) {
+    existing %>%
+      filter(!(Year == year & Round.Number == round)) %>%
+      bind_rows(new_rows) %>%
+      distinct()
+  } else {
+    distinct(new_rows)
+  }
+
+  write.csv(combined, output_path, row.names = FALSE)
+  message("Done. Added ", nrow(new_rows), " rows for ", year, " round ", round,
+          ". Total rows in file: ", nrow(combined))
+
+  invisible(new_rows)
 }
-
-new_data <- map(seasons_to_fetch, fetch_season) %>%
-  compact() %>%
-  bind_rows()
-
-####################################################################################
-# Combine with existing data, replacing re-fetched seasons
-####################################################################################
-
-if (!is.null(existing_data) && nrow(new_data) > 0) {
-  coaches_votes <- existing_data %>%
-    filter(!Year %in% seasons_to_fetch) %>%
-    bind_rows(new_data)
-} else {
-  coaches_votes <- if (is.null(existing_data)) new_data else existing_data
-}
-
-coaches_votes <- coaches_votes %>%
-  distinct()
-
-write.csv(coaches_votes, output_path, row.names = FALSE)
-
-message("Done. ", nrow(coaches_votes), " rows saved to ", output_path)

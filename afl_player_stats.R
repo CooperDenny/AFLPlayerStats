@@ -15,7 +15,7 @@ source("setup.R")
 output_path     <- "Player Data/AFL/afl_player_stats.csv"
 start_year      <- 2015
 end_year        <- as.integer(format(Sys.Date(), "%Y"))
-fetch_from_year <- 2026   # skip coverage check for seasons before this year
+fetch_from_year <- 2015   # skip coverage check for seasons before this year
 
 existing_data <- if (file.exists(output_path)) read.csv(output_path) else NULL
 
@@ -78,7 +78,8 @@ desired_cols <- c(
   "player.player.player.surname", "player.photoURL", "compSeason.year",
   "round.roundNumber", "team.name", "opponent",
   "teamStatus", "venue.name", "venue.state",
-  "player.player.player.playerJumperNumber", "timeOnGroundPercentage", "goals",
+  "utcStartTime", "player.player.player.playerJumperNumber", "player.player.position",
+  "timeOnGroundPercentage", "goals",
   "behinds", "kicks", "handballs",
   "disposals", "marks", "bounces",
   "tackles", "contestedPossessions", "uncontestedPossessions",
@@ -106,7 +107,8 @@ desired_cols <- c(
 output_col_names <- c(
   "Game.ID", "Player.ID", "First.Name", "Surname", "Photo", "Year", "Round.Number", "Team.Name",
   "Opponent.Name", "Team.Status", "Venue.Name", "Venue.State",
-  "Player.Jumper.Number", "Time.On.Ground.Percentage", "Goals", "Behinds",
+  "Match.Start.UTC", "Player.Jumper.Number", "Player.Position",
+  "Time.On.Ground.Percentage", "Goals", "Behinds",
   "Kicks", "Handballs", "Disposals", "Marks", "Bounces", "Tackles",
   "Contested.Possessions", "Uncontested.Possessions", "Total.Possessions",
   "Inside.50s", "Marks.Inside.50", "Contested.Marks", "Hitouts",

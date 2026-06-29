@@ -17,7 +17,10 @@ dir.create("Player Data/Brownlow Data", showWarnings = FALSE, recursive = TRUE)
 ####################################################################################
 
 afltables_player_stats <- list.files("Player Data/AFL Tables", pattern = "\\.csv$", full.names = TRUE) %>%
-  map_df(~read_csv(., col_types = cols(.default = "c"))) %>%
+  map_df(function(path) {
+    year <- as.numeric(str_extract(basename(path), "\\d{4}"))
+    read_csv(path, col_types = cols(.default = "c")) %>% mutate(Season = year)
+  }) %>%
   mutate(
     Playing.for    = as.character(Playing.for),
     Jumper.No.     = as.numeric(Jumper.No.),
@@ -104,6 +107,7 @@ afl_player_stats <- afl_player_stats %>%
       Player.ID == "CD_I998256"  ~ "Reuben",
       Player.ID == "CD_I1004995" ~ "Jordon",
       Player.ID == "CD_I1008185" ~ "Ned",
+      Player.ID == "CD_I1014038" ~ "Callum M.",
       TRUE ~ First.Name
     ),
     Surname = case_when(
