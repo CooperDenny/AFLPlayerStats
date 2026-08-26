@@ -148,6 +148,7 @@ coaches_votes <- coaches_votes %>%
       First.Name == "Joseph"    & Surname == "Fonti"         ~ "Joe",
       First.Name == "Lachie"    & Surname == "Bramble"      ~ "Lachlan",
       First.Name == "Lachie"    & Surname == "Cowan"        ~ "Lachlan",
+      First.Name == "Leo"       & Surname == "Lombard"      ~ "Leonardo",
       First.Name == "Matt"      & Surname == "Carroll"      ~ "Matthew",
       First.Name == "Matthew"   & Surname == "Roberts"      ~ "Matt",
       First.Name == "Matthew"   & Surname == "Spangher"     ~ "Matt",
@@ -159,10 +160,13 @@ coaches_votes <- coaches_votes %>%
       First.Name == "Nicholas"  & Surname == "Murray"       ~ "Nick",
       First.Name == "Nicholas"  & Surname == "Newman"       ~ "Nic",
       First.Name == "Samuel"    & Surname == "Durham"       ~ "Sam",
+      First.Name == "Samuel"    & Surname == "Swadling"     ~ "Sam",
       First.Name == "Scott"     & Surname == "Thompson" & Year == 2017 & Round.Number %in% c(6, 7, 9, 23) ~ "Scott D.",
       First.Name == "Scott"     & Surname == "Thompson" & Year == 2018 ~ "Scott D.",
+      First.Name == "Taylor"    & Surname == "Byrne"        ~ "Talor",
       First.Name == "Thomas"    & Surname == "Boyd"         ~ "Tom",
       First.Name == "Tom"       & Surname == "J Lynch"      ~ "Tom J.",
+      First.Name == "Will"      & Surname == "Edwards"      ~ "William",
       First.Name == "William"   & Surname == "Rioli"        ~ "Willie",
       TRUE ~ First.Name
     )
