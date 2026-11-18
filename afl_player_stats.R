@@ -64,7 +64,9 @@ for (year in fetch_from_year:end_year) {
 
 if (length(seasons_to_fetch) == 0) {
   message("All seasons up to date. Nothing to do.")
-  quit(save = "no")
+  # Stop the script without ending the R session: quit() would close RStudio's
+  # session when this file is source()d interactively.
+  if (interactive()) invokeRestart("abort") else quit(save = "no", status = 0)
 }
 
 message("Re-fetching seasons: ", paste(seasons_to_fetch, collapse = ", "))
