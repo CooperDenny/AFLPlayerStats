@@ -4,7 +4,7 @@ library(tidyverse)
 afl_player_details <- data.frame(
 )
 
-for (y in 2015:2026){
+for (y in 2015:as.integer(format(Sys.Date(), "%Y"))){
   afl_player_details_y <- fetch_player_details_afl(season = y)
   
   afl_player_details <- bind_rows(afl_player_details, afl_player_details_y)
